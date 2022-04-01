@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"go/ast"
 	"go/format"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime/debug"
 	"strconv"
@@ -18,6 +20,10 @@ import (
 )
 
 func main() {
+	var replace string
+	flag.StringVar(&replace, "replace", "", "replace")
+	flag.Parse()
+
 	buildInfo, ok := debug.ReadBuildInfo()
 	if !ok {
 		panic("no build info")
@@ -262,6 +268,30 @@ func main() {
 	multiWriter := io.MultiWriter(sourceFile, os.Stdout)
 
 	err = format.Node(multiWriter, fset, f)
+	if err != nil {
+		panic(err)
+	}
+
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+
+	modName := path.Base(workingDirectory)
+	cleanGoVersion := strings.TrimPrefix(buildInfo.GoVersion, "go")
+
+	modFormatted, err := utils.CreateModFormatted(modName, "v1.2.3", cleanGoVersion, replace)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("mod: '%s'\n", modFormatted)
+
+	modFile, err := os.Create("go.mod")
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = modFile.Write(modFormatted)
 	if err != nil {
 		panic(err)
 	}
